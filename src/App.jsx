@@ -11,13 +11,11 @@ function fileToDataUrl(file) {
     r.readAsDataURL(file);
   });
 }
-function loadImg(src) {
-  return new Promise((res, rej) => {
-    const img = new Image();
-    img.onload = () => res(img);
-    img.onerror = rej;
-    img.src = src;
-  });
+async function loadImg(src) {
+  const img = new Image();
+  img.src = src;
+  await img.decode();
+  return img;
 }
 function divX(baseX, deg) {
   const oh = Math.tan((deg * Math.PI) / 180) * H;
@@ -236,11 +234,20 @@ export default function StreamSlicer() {
       try {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        canvas.width = W; canvas.height = H;
+
+        // Compute active inside the effect — never stale
+        const activeN = mode === "peel" ? 4 : slotCount;
+        const activeImgs = images.slice(0, activeN);
+        if (!activeImgs.every(Boolean)) return;
+
+        // Force full canvas reset
+        canvas.width = 1;
+        canvas.width = W;
+        canvas.height = H;
         const ctx = canvas.getContext("2d");
         ctx.clearRect(0, 0, W, H);
 
-        const imgs = await Promise.all(active.map(loadImg));
+        const imgs = await Promise.all(activeImgs.map(loadImg));
         if (cancelled) return;
 
         // ── clip coords for slot i in a total-wide layout ──────────────────
