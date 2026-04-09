@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-const W = 1280, H = 480;
+const W = 1280, H = 720;
 
 // ── utils ──────────────────────────────────────────────────────────────────────
 function fileToDataUrl(file) {
@@ -224,6 +224,37 @@ export default function StreamSlicer() {
     return () => window.removeEventListener("paste", fn);
   }, [sel, active, n, setImg]);
 
+  // arrow keys — nudge selected slot's pan by 1px (10px with shift)
+  // Z/X — zoom in/out by 0.01 (0.1 with shift)
+  useEffect(() => {
+    const fn = e => {
+      if (e.target.tagName === "INPUT") return;
+      if (images[sel] == null) return;
+
+      // pan
+      const dirs = { ArrowLeft:"x", ArrowRight:"x", ArrowUp:"y", ArrowDown:"y" };
+      const axis = dirs[e.key];
+      if (axis) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const delta = (e.key === "ArrowRight" || e.key === "ArrowDown") ? step : -step;
+        setPan(sel, axis, pans[sel][axis] + delta);
+        return;
+      }
+
+      // zoom
+      if (e.key === "z" || e.key === "Z" || e.key === "x" || e.key === "X") {
+        e.preventDefault();
+        const step = e.shiftKey ? 0.1 : 0.01;
+        const delta = (e.key === "z" || e.key === "Z") ? step : -step;
+        const next = Math.min(4, Math.max(0.1, zooms[sel] + delta));
+        setZoom(sel, Math.round(next * 100) / 100);
+      }
+    };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, [sel, images, pans, zooms, setPan, setZoom]);
+
   // ── render ─────────────────────────────────────────────────────────────────
   // All rendering logic lives INSIDE the effect so it always sees current state
   useEffect(() => {
@@ -416,7 +447,7 @@ export default function StreamSlicer() {
           </div>
           <div style={{ width:36, height:2, background:"#e0ff4f", marginTop:5 }} />
           <div style={{ marginTop:8, fontSize:9, color:"#444", letterSpacing:1 }}>
-            SINGLE CLICK TO SELECT — DOUBLE CLICK TO BROWSE — CTRL+V / ⌘V TO PASTE — ⬆/✛/⬇ CYCLES TOP · MID · BOTTOM CROP
+            SINGLE CLICK TO SELECT — DOUBLE CLICK TO BROWSE — CTRL+V / ⌘V TO PASTE — ⬆/✛/⬇ CYCLES CROP — ARROWS NUDGE · Z/X ZOOM (SHIFT = 10×)
           </div>
         </div>
 
@@ -519,7 +550,7 @@ export default function StreamSlicer() {
             </div>
             <div style={{ display:"flex", gap:20, flexWrap:"wrap" }}>
               {[
-                { label:`ZOOM — ${zooms[sel].toFixed(2)}×`, min:1, max:4, step:.01, val:zooms[sel], fn:v=>setZoom(sel,v) },
+                { label:`ZOOM — ${zooms[sel].toFixed(2)}×`, min:0.1, max:4, step:.01, val:zooms[sel], fn:v=>setZoom(sel,v) },
                 { label:`PAN X — ${pans[sel].x>0?"+":""}${pans[sel].x}px`, min:-600, max:600, step:1, val:pans[sel].x, fn:v=>setPan(sel,"x",v) },
                 { label:`PAN Y — ${pans[sel].y>0?"+":""}${pans[sel].y}px`, min:-400, max:400, step:1, val:pans[sel].y, fn:v=>setPan(sel,"y",v) },
               ].map(({label,min,max,step,val,fn}) => (
